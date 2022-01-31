@@ -90,15 +90,17 @@
                     <div
                         :key="i"
                         v-for="(t, i) in tickers"
+                        @click="sel = t"
                         class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+                        :class="{ 'border-4': sel === t }"
                     >
                         <div class="px-4 py-5 sm:p-6 text-center">
-                            <dt class="text-sm font-medium text-gray-500 truncate">{{ t.name }}</dt>
+                            <dt class="text-sm font-medium text-gray-500 truncate">{{ t.name }} - USD</dt>
                             <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ t.price }}</dd>
                         </div>
                         <div class="w-full border-t border-gray-200"></div>
                         <button
-                            @click="handleDelete(t)"
+                            @click.stop="handleDelete(t)"
                             class="
                                 flex
                                 items-center
@@ -128,15 +130,17 @@
                 <hr class="w-full border-t border-gray-600 my-4" />
             </template>
 
-            <section class="relative">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">VUE - USD</h3>
+            <section class="relative" v-if="sel">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">{{ sel.name }}</h3>
                 <div class="flex items-end border-gray-600 border-b border-l h-64">
-                    <div class="bg-purple-800 border w-10 h-24"></div>
-                    <div class="bg-purple-800 border w-10 h-32"></div>
-                    <div class="bg-purple-800 border w-10 h-48"></div>
-                    <div class="bg-purple-800 border w-10 h-16"></div>
+                    <div
+                        v-for="(bar, idx) in normalizeGraph()"
+                        :key="idx"
+                        class="bg-purple-800 border w-10 h-24"
+                        :style="{ height: `${bar}%` }"
+                    ></div>
                 </div>
-                <button type="button" class="absolute top-0 right-0">
+                <button type="button" class="absolute top-0 right-0" @click="sel = null">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -170,41 +174,45 @@ export default {
 
     data() {
         return {
-            ticker: 'default',
-            tickers: [
-                {
-                    name: 'DEMO',
-                    price: '-',
-                },
-                {
-                    name: 'DEMO',
-                    price: '-',
-                },
-                {
-                    name: 'DEMO',
-                    price: '-',
-                },
-                {
-                    name: 'DEMO',
-                    price: '-',
-                },
-            ],
+            ticker: '',
+            tickers: [],
+            sel: null,
+            graph: [],
         };
     },
 
     methods: {
         add() {
-            const newTicker = {
-                name: 'DEMO1',
+            const currentTicker = {
+                name: this.ticker,
                 price: '-',
             };
 
-            this.tickers.push(newTicker);
+            this.tickers.push(currentTicker);
+            setInterval(async () => {
+                const f = await fetch(
+                    `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=53661f0f0d7f120fa525cdb05988f58171f0f293183af5a624526a806b547ee7`
+                );
+                const data = await f.json();
+
+                this.tickers.find(t => t.name === currentTicker.name).price = data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+                if (this.sel?.name === currentTicker.name) {
+                    this.graph.push(data.USD);
+                }
+            }, 3000);
             this.ticker = '';
         },
 
         handleDelete(tickerToRemove) {
             this.tickers = this.tickers.filter(t => t != tickerToRemove);
+        },
+
+        normalizeGraph() {
+            const maxValue = Math.max(...this.graph);
+            const minValue = Math.min(...this.graph);
+            return this.graph.map(price => {
+                5 + ((price - minValue) * 95) / (maxValue - minValue);
+            });
         },
     },
 };
